@@ -5,15 +5,6 @@ from plotly.subplots import make_subplots
 def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geometria=None):
     """
     Crea un gráfico 2D interactivo del campo magnético usando Plotly.
-    
-    Args:
-        xx, yy: Mallas de coordenadas
-        Bx, By: Componentes del campo magnético
-        titulo: Título del gráfico
-        geometria: dict con información de la geometría
-    
-    Returns:
-        fig: Figura de Plotly
     """
     # Calcular magnitud del campo
     B_mag = np.sqrt(Bx**2 + By**2)
@@ -21,7 +12,10 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
     # Crear figura
     fig = go.Figure()
     
-    # Añadir heatmap de magnitud
+    # Añadir heatmap de magnitud (usando escala logarítmica para mejor contraste si hay mucha variación)
+    # Para evitar log(0), sumamos un epsilon pequeño
+    # Pero un heatmap lineal con colorscale adecuado suele ser suficiente si se clipea
+    
     fig.add_trace(go.Heatmap(
         x=xx[0, :],
         y=yy[:, 0],
@@ -40,22 +34,41 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
     By_sub = By[::step, ::step]
     B_mag_sub = B_mag[::step, ::step]
     
-    # Normalizar para visualización
-    B_max = np.max(B_mag)
-    if B_max > 0:
-        scale = 0.08 * (xx.max() - xx.min())
-        Bx_scaled = Bx_sub / B_max * scale
-        By_scaled = By_sub / B_max * scale
-    else:
-        Bx_scaled = Bx_sub
-        By_scaled = By_sub
+    # --- NORMALIZACIÓN ROBUSTA ---
+    # El campo magnético diverge (1/r), por lo que los valores cercanos al alambre son enormes.
+    # Si normalizamos por el máximo absoluto, el resto de flechas serán invisibles.
+    # Usamos el percentil 90 para definir una "magnitud máxima visual" y clipeamos.
     
-    # Añadir quiver (vectores)
+    B_visual_max = np.percentile(B_mag_sub, 90) if len(B_mag_sub.flat) > 0 else 1.0
+    if B_visual_max == 0: B_visual_max = 1.0
+    
+    # Escala base para las flechas (relativa al tamaño del dominio)
+    scale = 0.15 * (xx.max() - xx.min()) / (xx_sub.shape[0]) * 5 # Factor empírico
+    
     for i in range(xx_sub.shape[0]):
         for j in range(xx_sub.shape[1]):
             x0, y0 = xx_sub[i, j], yy_sub[i, j]
-            dx, dy = Bx_scaled[i, j], By_scaled[i, j]
+            bx, by = Bx_sub[i, j], By_sub[i, j]
+            b_mag = B_mag_sub[i, j]
             
+            if b_mag == 0: continue
+            
+            # Dirección unitaria
+            ux, uy = bx / b_mag, by / b_mag
+            
+            # Longitud visual: proporcional a la magnitud pero clipeada
+            # Opcional: Usar longitud fija para ver dirección clara, o logarítmica
+            # Aquí usamos: longitud fija * factor de atenuación suave
+            # Para que se vea "profesional", las flechas no deben variar demasiado en tamaño
+            
+            # Enfoque híbrido: Flechas casi del mismo tamaño, variando ligeramente con intensidad
+            # length = base_length * (0.5 + 0.5 * min(b_mag / B_visual_max, 1.0))
+            
+            arrow_len = scale * (0.5 + 0.5 * np.minimum(b_mag / B_visual_max, 1.0))
+            
+            dx, dy = ux * arrow_len, uy * arrow_len
+            
+            # Línea de la flecha
             fig.add_trace(go.Scatter(
                 x=[x0, x0 + dx],
                 y=[y0, y0 + dy],
@@ -65,14 +78,14 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
                 hoverinfo='skip'
             ))
             
-            # Flecha
+            # Punta de la flecha
             fig.add_trace(go.Scatter(
                 x=[x0 + dx],
                 y=[y0 + dy],
                 mode='markers',
                 marker=dict(
                     symbol='arrow',
-                    size=8,
+                    size=6,
                     color='white',
                     angle=np.degrees(np.arctan2(dy, dx)),
                     angleref='previous'
@@ -86,14 +99,13 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
         if geometria['tipo'] in ['alambre', 'ambos']:
             L = geometria.get('L', 2)
             z_offset = geometria.get('z_offset_alambre', 0)
-            # En vista 2D (XY), el alambre se ve como un punto en (0,0)
             fig.add_trace(go.Scatter(
                 x=[0],
                 y=[0],
                 mode='markers',
-                marker=dict(size=12, color='red', symbol='circle', line=dict(width=2, color='white')),
-                name='Alambre',
-                hovertemplate=f'Alambre (eje Z)<br>L={L} m<br>z_offset={z_offset} m<extra></extra>'
+                marker=dict(size=15, color='red', symbol='x', line=dict(width=2, color='yellow')),
+                name='Alambre (Eje Z)',
+                hovertemplate=f'Alambre<br>L={L} m<br>z_offset={z_offset} m<extra></extra>'
             ))
         
         if geometria['tipo'] in ['espira', 'ambos']:
@@ -109,7 +121,6 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
                 hovertemplate=f'Espira<br>Radio={a} m<br>z_offset={z_offset} m<extra></extra>'
             ))
     
-    # Configurar layout
     fig.update_layout(
         title=titulo,
         xaxis=dict(title='x (m)', scaleanchor='y', scaleratio=1),
@@ -117,7 +128,8 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
         width=700,
         height=700,
         showlegend=True,
-        hovermode='closest'
+        hovermode='closest',
+        margin=dict(l=20, r=20, t=40, b=20)
     )
     
     return fig
@@ -126,45 +138,41 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
 def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", geometria=None):
     """
     Crea un gráfico 3D interactivo del campo magnético usando Plotly.
-    
-    Args:
-        x, y, z: Coordenadas de los puntos (arrays 1D)
-        Bx, By, Bz: Componentes del campo magnético
-        titulo: Título del gráfico
-        geometria: dict con información de la geometría
-    
-    Returns:
-        fig: Figura de Plotly
     """
     # Calcular magnitud
     B_mag = np.sqrt(Bx**2 + By**2 + Bz**2)
     
-    # Normalizar vectores para visualización
-    B_max = np.max(B_mag)
-    if B_max > 0:
-        scale = 0.15
-        Bx_norm = Bx / B_max * scale
-        By_norm = By / B_max * scale
-        Bz_norm = Bz / B_max * scale
-    else:
-        Bx_norm = Bx
-        By_norm = By
-        Bz_norm = Bz
+    # --- NORMALIZACIÓN ROBUSTA PARA CONOS ---
+    # Usamos vectores unitarios para la dirección y dejamos que el color indique la magnitud.
+    # Plotly Cone usa (u,v,w) para tamaño Y dirección.
+    # Si normalizamos (u,v,w), todos los conos tendrán el mismo tamaño (controlado por sizeref).
+    # Esto es ideal para visualizar la estructura del campo sin que las singularidades oculten todo.
+    
+    # Evitar división por cero
+    B_mag_safe = np.where(B_mag == 0, 1e-9, B_mag)
+    
+    Bx_unit = Bx / B_mag_safe
+    By_unit = By / B_mag_safe
+    Bz_unit = Bz / B_mag_safe
     
     # Crear figura
     fig = go.Figure()
     
     # Añadir vectores usando Cone plot
+    # Usamos vectores unitarios -> tamaño uniforme
+    # Coloreamos por la magnitud real (B_mag)
+    
     fig.add_trace(go.Cone(
         x=x, y=y, z=z,
-        u=Bx_norm, v=By_norm, w=Bz_norm,
+        u=Bx_unit, v=By_unit, w=Bz_unit,
         colorscale='Viridis',
         sizemode='absolute',
-        sizeref=0.3,
+        sizeref=0.5, # Tamaño fijo de los conos
+        cmin=np.min(B_mag),
+        cmax=np.percentile(B_mag, 95), # Saturar el color al 95% para ver contraste
         colorbar=dict(title='|B| (T)'),
-        cmin=0,
-        cmax=B_max,
-        hovertemplate='x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<br>|B|: %{marker.color:.3e} T<extra></extra>',
+        hovertemplate='x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<br>|B|: %{customdata:.3e} T<extra></extra>',
+        customdata=B_mag, # Pasar magnitud real para el tooltip
         showscale=True
     ))
     
@@ -179,7 +187,7 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
                 y=np.zeros_like(zs),
                 z=zs,
                 mode='lines',
-                line=dict(color='red', width=6),
+                line=dict(color='red', width=8),
                 name='Alambre',
                 hovertemplate=f'Alambre<br>L={L} m<extra></extra>'
             ))
@@ -193,7 +201,7 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
                 y=a*np.sin(theta),
                 z=np.full_like(theta, z_offset),
                 mode='lines',
-                line=dict(color='cyan', width=6),
+                line=dict(color='cyan', width=8),
                 name='Espira',
                 hovertemplate=f'Espira<br>Radio={a} m<extra></extra>'
             ))
@@ -209,7 +217,8 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
         ),
         width=700,
         height=700,
-        showlegend=True
+        showlegend=True,
+        margin=dict(l=0, r=0, t=40, b=0)
     )
     
     return fig

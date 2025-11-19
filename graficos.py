@@ -5,29 +5,38 @@ import numpy as np
 def graficar_2d(x, y, Bx, By, titulo="Campo Magnético", geometria=None):
     """
     Grafica campo magnético en 2D con vectores.
-    
-    Args:
-        x, y: Mallas de coordenadas
-        Bx, By: Componentes del campo
-        titulo: Título del gráfico
-        geometria: dict con 'tipo' ('alambre', 'espira', 'ambos') y parámetros
     """
     plt.figure(figsize=(8, 8))
     
-    # Normalizar vectores para mejor visualización
+    # Calcular magnitud
     B_mag = np.sqrt(Bx**2 + By**2)
-    B_mag_max = np.max(B_mag)
-    if B_mag_max > 0:
-        Bx_norm = Bx / B_mag_max
-        By_norm = By / B_mag_max
-    else:
-        Bx_norm = Bx
-        By_norm = By
     
-    # Colorear por magnitud
-    colors = B_mag
-    plt.quiver(x, y, Bx_norm, By_norm, colors, cmap='viridis', scale=30)
-    plt.colorbar(label='|B| (T)')
+    # --- NORMALIZACIÓN ROBUSTA ---
+    # Clipear la magnitud para visualización para evitar que singularidades dominen
+    B_visual_max = np.percentile(B_mag, 90) if B_mag.size > 0 else 1.0
+    if B_visual_max == 0: B_visual_max = 1.0
+    
+    # Normalizar vectores
+    # Evitar división por cero
+    B_mag_safe = np.where(B_mag == 0, 1e-9, B_mag)
+    Bx_unit = Bx / B_mag_safe
+    By_unit = By / B_mag_safe
+    
+    # Escalar vectores: longitud base * factor de intensidad atenuado
+    # Esto asegura que se vea la dirección en todas partes
+    scale_factor = np.minimum(B_mag / B_visual_max, 1.0)
+    # Mezcla: 50% longitud fija, 50% variable
+    lengths = 0.5 + 0.5 * scale_factor
+    
+    Bx_vis = Bx_unit * lengths
+    By_vis = By_unit * lengths
+    
+    # Colorear por magnitud (logarítmico o clipeado)
+    # Usamos clipeado para consistencia
+    colors = np.minimum(B_mag, np.percentile(B_mag, 95))
+    
+    plt.quiver(x, y, Bx_vis, By_vis, colors, cmap='viridis', scale=25, width=0.005)
+    plt.colorbar(label='|B| (T) (clipeado)')
     
     # Dibujar geometría de la fuente
     if geometria:
@@ -53,32 +62,33 @@ def graficar_2d(x, y, Bx, By, titulo="Campo Magnético", geometria=None):
 def graficar_3d(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", geometria=None):
     """
     Grafica campo magnético en 3D con vectores.
-    
-    Args:
-        x, y, z: Coordenadas de los puntos
-        Bx, By, Bz: Componentes del campo
-        titulo: Título del gráfico
-        geometria: dict con 'tipo' ('alambre', 'espira', 'ambos') y parámetros
     """
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
     
-    # Normalizar vectores
+    # Calcular magnitud
     B_mag = np.sqrt(Bx**2 + By**2 + Bz**2)
-    B_mag_max = np.max(B_mag)
-    if B_mag_max > 0:
-        Bx_norm = Bx / B_mag_max
-        By_norm = By / B_mag_max
-        Bz_norm = Bz / B_mag_max
-    else:
-        Bx_norm = Bx
-        By_norm = By
-        Bz_norm = Bz
     
-    # Quiver plot con colores
-    colors = B_mag.flatten()
-    q = ax.quiver(x, y, z, Bx_norm, By_norm, Bz_norm, 
-                  length=0.15, normalize=False, 
+    # Normalizar vectores (longitud fija para 3D suele ser mejor para ver estructura)
+    B_mag_safe = np.where(B_mag == 0, 1e-9, B_mag)
+    Bx_unit = Bx / B_mag_safe
+    By_unit = By / B_mag_safe
+    Bz_unit = Bz / B_mag_safe
+    
+    # Colorear por magnitud
+    # Matplotlib quiver 3D no soporta colormap fácilmente en versiones antiguas,
+    # pero intentaremos pasar colores si es posible, o usar longitud fija.
+    # Para robustez en mpl 3d, usamos longitud fija y color sólido o variable si se puede.
+    # Simplificación: Longitud fija proporcional a una escala pequeña
+    
+    length = 0.1
+    
+    # Quiver plot
+    # Nota: mpl 3d quiver no soporta array de colores fácilmente en todas las versiones
+    # Usaremos color por magnitud normalizada si es posible, sino un color sólido
+    
+    q = ax.quiver(x, y, z, Bx_unit, By_unit, Bz_unit, 
+                  length=length, normalize=True, 
                   cmap='viridis', linewidth=1.5)
     
     # Dibujar geometría
