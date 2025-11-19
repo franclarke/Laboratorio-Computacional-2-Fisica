@@ -251,6 +251,104 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
         cmax=np.percentile(B_mag, 95), # Saturar el color al 95% para ver contraste
         colorbar=dict(title='|B| (T)'),
         hovertemplate='x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<br>|B|: %{customdata:.3e} T<extra></extra>',
+        customdata=B_mag, # Pasar magnitud real para el tooltip
+        showscale=True
+    ))
+    
+    # Dibujar geometría
+    if geometria:
+        if geometria['tipo'] in ['alambre', 'ambos']:
+            L = geometria.get('L', 2)
+            z_offset = geometria.get('z_offset_alambre', 0)
+            I_val = geometria.get('I', geometria.get('I_alambre', 1.0))
+            signo = 1 if I_val >= 0 else -1
+            
+            zs = np.linspace(z_offset - L/2, z_offset + L/2, 50)
+            fig.add_trace(go.Scatter3d(
+                x=np.zeros_like(zs),
+                y=np.zeros_like(zs),
+                z=zs,
+                mode='lines',
+                line=dict(color='red', width=8),
+                name='Alambre',
+                hovertemplate=f'Alambre<br>L={L} m<extra></extra>'
+            ))
+            # Cono indicador dirección corriente
+            fig.add_trace(go.Cone(
+                x=[0], y=[0], z=[z_offset],
+                u=[0], v=[0], w=[signo],
+                sizemode="absolute", sizeref=0.5, anchor="tail",
+                showscale=False, colorscale=[[0, 'red'], [1, 'red']]
+            ))
+        
+        if geometria['tipo'] in ['espira', 'ambos']:
+            a = geometria.get('a', 0.5)
+            z_offset = geometria.get('z_offset_espira', 0)
+            I_val = geometria.get('I', geometria.get('I_espira', 1.0))
+            signo = 1 if I_val >= 0 else -1
+            
+            theta = np.linspace(0, 2*np.pi, 100)
+            fig.add_trace(go.Scatter3d(
+                x=a*np.cos(theta),
+                y=a*np.sin(theta),
+                z=np.full_like(theta, z_offset),
+                mode='lines',
+                line=dict(color='cyan', width=8),
+                name='Espira',
+                hovertemplate=f'Espira<br>Radio={a} m<extra></extra>'
+            ))
+            # Conos indicadores dirección corriente
+            th_arrows = [0, np.pi/2, np.pi, 3*np.pi/2]
+            x_arr = a * np.cos(th_arrows)
+            y_arr = a * np.sin(th_arrows)
+            z_arr = np.full_like(x_arr, z_offset)
+            # Tangentes: (-sin, cos, 0) * signo
+            u_arr = -np.sin(th_arrows) * signo
+            v_arr = np.cos(th_arrows) * signo
+            w_arr = np.zeros_like(u_arr)
+            
+            fig.add_trace(go.Cone(
+                x=x_arr, y=y_arr, z=z_arr,
+                u=u_arr, v=v_arr, w=w_arr,
+                sizemode="absolute", sizeref=0.3, anchor="center",
+                showscale=False, colorscale=[[0, 'cyan'], [1, 'cyan']]
+            ))
+
+        if geometria['tipo'] == 'helmholtz':
+            R = geometria.get('R', 0.5)
+            I_val = geometria.get('I', 1.0)
+            signo = 1 if I_val >= 0 else -1
+            theta = np.linspace(0, 2*np.pi, 100)
+            
+            # Flechas para ambas bobinas
+            th_arrows = [0, np.pi/2, np.pi, 3*np.pi/2]
+            x_arr = R * np.cos(th_arrows)
+            y_arr = R * np.sin(th_arrows)
+            u_arr = -np.sin(th_arrows) * signo
+            v_arr = np.cos(th_arrows) * signo
+            w_arr = np.zeros_like(u_arr)
+            
+            for z_c, name in [(-R/2, 'Bobina 1'), (R/2, 'Bobina 2')]:
+                fig.add_trace(go.Scatter3d(
+                    x=R*np.cos(theta),
+                    y=R*np.sin(theta),
+                    z=np.full_like(theta, z_c),
+                    mode='lines',
+                    line=dict(color='orange', width=8),
+                    name=name,
+                    hovertemplate=f'{name}<br>z={z_c} m<extra></extra>'
+                ))
+                
+                fig.add_trace(go.Cone(
+                    x=x_arr, y=y_arr, z=np.full_like(x_arr, z_c),
+                    u=u_arr, v=v_arr, w=w_arr,
+                    sizemode="absolute", sizeref=0.3, anchor="center",
+                    showscale=False, colorscale=[[0, 'orange'], [1, 'orange']]
+                ))
+    
+    # Configurar layout
+    fig.update_layout(
+        title=titulo,
         scene=dict(
             xaxis_title='x (m)',
             yaxis_title='y (m)',
@@ -267,7 +365,6 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
             xanchor="center",
             x=0.5
         )
-    )
     )
     
     return fig
