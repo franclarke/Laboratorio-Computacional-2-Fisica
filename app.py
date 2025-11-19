@@ -43,17 +43,26 @@ st.caption("Exploración interactiva de la Ley de Biot-Savart")
 st.sidebar.header("Parámetros")
 
 with st.sidebar.expander("🔴 Alambre Recto", expanded=True):
-    I_alambre = st.slider("Corriente (A)", 0.0, 20.0, 10.0, 0.5, key="I_alambre")
+    I_alambre_mag = st.slider("Corriente (A)", 0.0, 20.0, 10.0, 0.5, key="I_alambre")
+    dir_alambre = st.radio("Sentido", ["+Z (Hacia arriba)", "-Z (Hacia abajo)"], key="dir_alambre")
+    I_alambre = I_alambre_mag if dir_alambre == "+Z (Hacia arriba)" else -I_alambre_mag
+    
     L_alambre = st.slider("Longitud (m)", 0.5, 5.0, 2.0, 0.1, key="L_alambre")
     z_offset_alambre = st.slider("Posición Z (m)", -2.0, 2.0, 0.0, 0.1, key="z_alambre")
 
 with st.sidebar.expander("🔵 Espira Circular", expanded=True):
-    I_espira = st.slider("Corriente (A)", 0.0, 20.0, 5.0, 0.5, key="I_espira")
+    I_espira_mag = st.slider("Corriente (A)", 0.0, 20.0, 5.0, 0.5, key="I_espira")
+    dir_espira = st.radio("Sentido", ["Antihorario", "Horario"], key="dir_espira")
+    I_espira = I_espira_mag if dir_espira == "Antihorario" else -I_espira_mag
+    
     a_espira = st.slider("Radio (m)", 0.1, 2.0, 0.5, 0.05, key="a_espira")
     z_offset_espira = st.slider("Posición Z (m)", -2.0, 2.0, 0.0, 0.1, key="z_espira")
 
 with st.sidebar.expander("🟠 Bobinas de Helmholtz", expanded=False):
-    I_helmholtz = st.slider("Corriente (A)", 0.0, 20.0, 5.0, 0.5, key="I_helmholtz")
+    I_helmholtz_mag = st.slider("Corriente (A)", 0.0, 20.0, 5.0, 0.5, key="I_helmholtz")
+    dir_helmholtz = st.radio("Sentido", ["Antihorario", "Horario"], key="dir_helmholtz")
+    I_helmholtz = I_helmholtz_mag if dir_helmholtz == "Antihorario" else -I_helmholtz_mag
+    
     R_helmholtz = st.slider("Radio R (m)", 0.1, 2.0, 0.5, 0.05, key="R_helmholtz")
     st.caption(f"Separación d = R = {R_helmholtz} m")
 
@@ -213,14 +222,14 @@ def render_view(title, B_2d, B_3d, geo, key_suffix):
 
 with tab1:
     render_view("Alambre", B_alambre_2d, B_alambre_3d, 
-                {'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre}, "alambre")
+                {'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre, 'I': I_alambre}, "alambre")
     
     # Calculadora específica para Alambre
     render_point_calculator("alambre", campo_alambre, I_alambre, L_alambre, N_elementos, z_offset=z_offset_alambre)
 
 with tab2:
     render_view("Espira", B_espira_2d, B_espira_3d, 
-                {'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira}, "espira")
+                {'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira, 'I': I_espira}, "espira")
     
     # Calculadora específica para Espira
     render_point_calculator("espira", campo_espira, I_espira, a_espira, N_elementos, z_offset=z_offset_espira)
@@ -228,7 +237,8 @@ with tab2:
 with tab3:
     render_view("Total", B_total_2d, B_total_3d, 
                 {'tipo': 'ambos', 'L': L_alambre, 'a': a_espira, 
-                 'z_offset_alambre': z_offset_alambre, 'z_offset_espira': z_offset_espira}, "total")
+                 'z_offset_alambre': z_offset_alambre, 'z_offset_espira': z_offset_espira,
+                 'I_alambre': I_alambre, 'I_espira': I_espira}, "total")
     
     # Calculadora para Superposición
     def calc_total(I_a, L_a, z_a, I_e, a_e, z_e, N, pt):
@@ -243,7 +253,7 @@ with tab4:
     st.markdown(f"**Configuración**: Dos espiras de radio $R={R_helmholtz}$ m separadas por una distancia $d=R$. Corriente $I={I_helmholtz}$ A.")
     
     render_view("Helmholtz", B_helmholtz_2d, B_helmholtz_3d,
-                {'tipo': 'helmholtz', 'R': R_helmholtz}, "helmholtz")
+                {'tipo': 'helmholtz', 'R': R_helmholtz, 'I': I_helmholtz}, "helmholtz")
     
     # Calculadora Helmholtz
     def calc_helmholtz(I, R, N, pt):
