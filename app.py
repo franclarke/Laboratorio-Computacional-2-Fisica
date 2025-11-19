@@ -174,11 +174,11 @@ def render_point_calculator(key_suffix, calc_func, *args, **kwargs):
     """Helper para renderizar la calculadora en un punto dentro de una tab"""
     with st.expander(f"📍 Calculadora de Campo en Punto ({key_suffix.capitalize()})"):
         c1, c2, c3 = st.columns(3)
-        xt = c1.number_input("x (m)", value=0.3, step=0.1, format="%.2f", key=f"x_{key_suffix}")
-        yt = c2.number_input("y (m)", value=0.0, step=0.1, format="%.2f", key=f"y_{key_suffix}")
-        zt = c3.number_input("z (m)", value=0.2, step=0.1, format="%.2f", key=f"z_{key_suffix}")
+        xt = c1.number_input("x (m)", value=0.0, step=0.1, format="%.2f", key=f"calc_x_{key_suffix}")
+        yt = c2.number_input("y (m)", value=0.0, step=0.1, format="%.2f", key=f"calc_y_{key_suffix}")
+        zt = c3.number_input("z (m)", value=0.0, step=0.1, format="%.2f", key=f"calc_z_{key_suffix}")
         
-        if st.button("Calcular", key=f"btn_{key_suffix}"):
+        if st.button("Calcular", key=f"calc_btn_{key_suffix}"):
             pt = np.array([[xt, yt, zt]])
             B_res = calc_func(*args, pt, **kwargs)
             B_norm = np.linalg.norm(B_res)
