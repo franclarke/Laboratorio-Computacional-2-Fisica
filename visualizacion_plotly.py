@@ -2,7 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geometria=None, xlabel='x (m)', ylabel='y (m)'):
+def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geometria=None, xlabel='x (m)', ylabel='y (m)', plano='XY'):
     """
     Crea un gráfico 2D interactivo del campo magnético usando Plotly.
     """
@@ -12,10 +12,7 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
     # Crear figura
     fig = go.Figure()
     
-    # Añadir heatmap de magnitud (usando escala logarítmica para mejor contraste si hay mucha variación)
-    # Para evitar log(0), sumamos un epsilon pequeño
-    # Pero un heatmap lineal con colorscale adecuado suele ser suficiente si se clipea
-    
+    # Añadir heatmap de magnitud
     fig.add_trace(go.Heatmap(
         x=xx[0, :],
         y=yy[:, 0],
@@ -35,15 +32,10 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
     B_mag_sub = B_mag[::step, ::step]
     
     # --- NORMALIZACIÓN ROBUSTA ---
-    # El campo magnético diverge (1/r), por lo que los valores cercanos al alambre son enormes.
-    # Si normalizamos por el máximo absoluto, el resto de flechas serán invisibles.
-    # Usamos el percentil 90 para definir una "magnitud máxima visual" y clipeamos.
-    
     B_visual_max = np.percentile(B_mag_sub, 90) if len(B_mag_sub.flat) > 0 else 1.0
     if B_visual_max == 0: B_visual_max = 1.0
     
-    # Escala base para las flechas (relativa al tamaño del dominio)
-    scale = 0.15 * (xx.max() - xx.min()) / (xx_sub.shape[0]) * 5 # Factor empírico
+    scale = 0.15 * (xx.max() - xx.min()) / (xx_sub.shape[0]) * 5 
     
     for i in range(xx_sub.shape[0]):
         for j in range(xx_sub.shape[1]):
@@ -53,57 +45,68 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
             
             if b_mag == 0: continue
             
-            # Dirección unitaria
             ux, uy = bx / b_mag, by / b_mag
-            
-            # Longitud visual: proporcional a la magnitud pero clipeada
-            # Opcional: Usar longitud fija para ver dirección clara, o logarítmica
-            # Aquí usamos: longitud fija * factor de atenuación suave
-            # Para que se vea "profesional", las flechas no deben variar demasiado en tamaño
-            
-            # Enfoque híbrido: Flechas casi del mismo tamaño, variando ligeramente con intensidad
-            # length = base_length * (0.5 + 0.5 * min(b_mag / B_visual_max, 1.0))
-            
             arrow_len = scale * (0.5 + 0.5 * np.minimum(b_mag / B_visual_max, 1.0))
-            
             dx, dy = ux * arrow_len, uy * arrow_len
             
-            # Línea de la flecha
             fig.add_trace(go.Scatter(
-                x=[x0, x0 + dx],
-                y=[y0, y0 + dy],
-                mode='lines',
-                line=dict(color='white', width=1.5),
-                showlegend=False,
-                hoverinfo='skip'
+                x=[x0, x0 + dx], y=[y0, y0 + dy], mode='lines',
+                line=dict(color='white', width=1.5), showlegend=False, hoverinfo='skip'
             ))
-            
-            # Punta de la flecha
             fig.add_trace(go.Scatter(
-                x=[x0 + dx],
-                y=[y0 + dy],
-                mode='markers',
-                marker=dict(
-                    symbol='arrow',
-                    size=6,
-                    color='white',
-                    angle=np.degrees(np.arctan2(dy, dx)),
-                    angleref='previous'
-                ),
-                showlegend=False,
-                hoverinfo='skip'
+                x=[x0 + dx], y=[y0 + dy], mode='markers',
+                marker=dict(symbol='arrow', size=6, color='white', angle=np.degrees(np.arctan2(dy, dx)), angleref='previous'),
+                showlegend=False, hoverinfo='skip'
             ))
     
-    # Dibujar geometría
+    # Dibujar geometría según el plano
     if geometria:
-        # Nota: La geometría aquí asume proyección al plano 2D. 
-        # Si cambiamos de plano, la proyección debería cambiar.
-        # Por simplicidad, dibujamos proyecciones genéricas o puntos de corte si es posible.
-        # Para esta implementación rápida, mantenemos la lógica simple y el usuario interpretará.
-        pass 
-        # TODO: Mejorar proyección de geometría según el plano. 
-        # Por ahora, desactivamos geometría compleja en 2D si no es XY para evitar confusión,
-        # o dejamos que app.py maneje qué pasar en 'geometria'.
+        plano_key = plano.split()[0] # 'XY', 'XZ', 'YZ'
+        
+        # --- ALAMBRE ---
+        if geometria['tipo'] in ['alambre', 'ambos']:
+            L = geometria.get('L', 2)
+            z_off = geometria.get('z_offset_alambre', 0)
+            
+            if plano_key == 'XY':
+                # Alambre es un punto en el origen (si z_off está en rango, pero dibujamos proyección)
+                fig.add_trace(go.Scatter(
+                    x=[0], y=[0], mode='markers',
+                    marker=dict(size=12, color='red', symbol='x'),
+                    name='Alambre (Eje Z)'
+                ))
+            elif plano_key in ['XZ', 'YZ']:
+                # Alambre es una línea vertical en el eje Z (que es el eje Y del plot en XZ/YZ)
+                # En XZ: x=0, z varía. En YZ: y=0, z varía.
+                # El eje vertical del plot es 'y' (que corresponde a z físico)
+                fig.add_trace(go.Scatter(
+                    x=[0, 0], y=[z_off - L/2, z_off + L/2], mode='lines',
+                    line=dict(color='red', width=4),
+                    name='Alambre'
+                ))
+
+        # --- ESPIRA ---
+        if geometria['tipo'] in ['espira', 'ambos']:
+            a = geometria.get('a', 0.5)
+            z_off = geometria.get('z_offset_espira', 0)
+            
+            if plano_key == 'XY':
+                # Espira es un círculo
+                theta = np.linspace(0, 2*np.pi, 100)
+                fig.add_trace(go.Scatter(
+                    x=a*np.cos(theta), y=a*np.sin(theta), mode='lines',
+                    line=dict(color='cyan', width=3),
+                    name='Espira'
+                ))
+            elif plano_key in ['XZ', 'YZ']:
+                # Espira son dos puntos (corte transversal)
+                # En XZ: puntos en (a, z_off) y (-a, z_off)
+                # En YZ: puntos en (a, z_off) y (-a, z_off) (simétrico)
+                fig.add_trace(go.Scatter(
+                    x=[-a, a], y=[z_off, z_off], mode='markers',
+                    marker=dict(size=10, color='cyan', symbol='circle'),
+                    name='Espira (Corte)'
+                ))
     
     fig.update_layout(
         title=titulo,
@@ -111,7 +114,7 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
         yaxis=dict(title=ylabel),
         width=700,
         height=700,
-        showlegend=False, # Ocultar leyenda para limpiar vista 2D
+        showlegend=True,
         hovermode='closest',
         margin=dict(l=20, r=20, t=40, b=20)
     )

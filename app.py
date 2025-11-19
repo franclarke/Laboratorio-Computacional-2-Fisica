@@ -196,9 +196,10 @@ with tab1:
             uu, vv, Bu_2d, Bv_2d,
             titulo="",
             geometria={'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre},
-            xlabel=u_label, ylabel=v_label
+            xlabel=u_label, ylabel=v_label,
+            plano=plano_vista
         )
-        st.plotly_chart(fig_2d_alambre, use_container_width=True, key="chart_2d_alambre")
+        st.plotly_chart(fig_2d_alambre, use_container_width=True, key=f"chart_2d_alambre_{plano_vista}")
     
     with col2:
         st.subheader("Vista 3D")
@@ -228,9 +229,10 @@ with tab2:
             uu, vv, Bu_espira_2d, Bv_espira_2d,
             titulo="",
             geometria={'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira},
-            xlabel=u_label, ylabel=v_label
+            xlabel=u_label, ylabel=v_label,
+            plano=plano_vista
         )
-        st.plotly_chart(fig_2d_espira, use_container_width=True, key="chart_2d_espira")
+        st.plotly_chart(fig_2d_espira, use_container_width=True, key=f"chart_2d_espira_{plano_vista}")
     
     with col2:
         st.subheader("Vista 3D")
@@ -266,9 +268,10 @@ with tab3:
                 'z_offset_alambre': z_offset_alambre,
                 'z_offset_espira': z_offset_espira
             },
-            xlabel=u_label, ylabel=v_label
+            xlabel=u_label, ylabel=v_label,
+            plano=plano_vista
         )
-        st.plotly_chart(fig_2d_total, use_container_width=True, key="chart_2d_total")
+        st.plotly_chart(fig_2d_total, use_container_width=True, key=f"chart_2d_total_{plano_vista}")
     
     with col2:
         st.subheader("Vista 3D")
