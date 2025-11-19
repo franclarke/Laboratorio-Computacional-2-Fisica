@@ -79,13 +79,66 @@ N_elementos = st.sidebar.slider(
 # CÁLCULO DE CAMPOS
 # ============================================================================
 
-# Malla 2D (plano XY, z=0)
-x_2d = np.linspace(-1.5, 1.5, resolucion_2d)
-y_2d = np.linspace(-1.5, 1.5, resolucion_2d)
-xx_2d, yy_2d = np.meshgrid(x_2d, y_2d)
-r_2d = np.c_[xx_2d.ravel(), yy_2d.ravel(), np.zeros_like(xx_2d).ravel()]
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 👁️ Vistas 2D")
+plano_vista = st.sidebar.radio(
+    "Plano de visualización 2D",
+    ["XY (Planta)", "XZ (Perfil)", "YZ (Perfil Lateral)"],
+    index=1, # Default a XZ para ver mejor la espira
+    help="Seleccione el plano de corte para los gráficos 2D"
+)
 
-# Malla 3D
+# Configuración dinámica según el plano
+if plano_vista == "XY (Planta)":
+    coord_fija_label = "z"
+    coord_fija_val = st.sidebar.slider("Posición Z del plano (m)", -2.0, 2.0, 0.0, 0.1)
+    
+    u_label, v_label = "x (m)", "y (m)"
+    
+    # Malla 2D
+    u = np.linspace(-1.5, 1.5, resolucion_2d)
+    v = np.linspace(-1.5, 1.5, resolucion_2d)
+    uu, vv = np.meshgrid(u, v)
+    
+    # Puntos 3D: (x, y, z_fijo)
+    r_2d = np.c_[uu.ravel(), vv.ravel(), np.full_like(uu, coord_fija_val).ravel()]
+    
+    idx_u, idx_v = 0, 1 # Índices de componentes vectoriales (Bx, By)
+
+elif plano_vista == "XZ (Perfil)":
+    coord_fija_label = "y"
+    coord_fija_val = st.sidebar.slider("Posición Y del plano (m)", -2.0, 2.0, 0.0, 0.1)
+    
+    u_label, v_label = "x (m)", "z (m)"
+    
+    # Malla 2D
+    u = np.linspace(-1.5, 1.5, resolucion_2d)
+    v = np.linspace(-1.5, 1.5, resolucion_2d)
+    uu, vv = np.meshgrid(u, v)
+    
+    # Puntos 3D: (x, y_fijo, z)
+    r_2d = np.c_[uu.ravel(), np.full_like(uu, coord_fija_val).ravel(), vv.ravel()]
+    
+    idx_u, idx_v = 0, 2 # Índices de componentes vectoriales (Bx, Bz)
+
+else: # YZ
+    coord_fija_label = "x"
+    coord_fija_val = st.sidebar.slider("Posición X del plano (m)", -2.0, 2.0, 0.0, 0.1)
+    
+    u_label, v_label = "y (m)", "z (m)"
+    
+    # Malla 2D
+    u = np.linspace(-1.5, 1.5, resolucion_2d)
+    v = np.linspace(-1.5, 1.5, resolucion_2d)
+    uu, vv = np.meshgrid(u, v)
+    
+    # Puntos 3D: (x_fijo, y, z)
+    r_2d = np.c_[np.full_like(uu, coord_fija_val).ravel(), uu.ravel(), vv.ravel()]
+    
+    idx_u, idx_v = 1, 2 # Índices de componentes vectoriales (By, Bz)
+
+
+# Malla 3D (siempre igual)
 x_3d = np.linspace(-1.5, 1.5, resolucion_3d)
 y_3d = np.linspace(-1.5, 1.5, resolucion_3d)
 z_3d = np.linspace(-1.5, 1.5, resolucion_3d)
@@ -105,9 +158,9 @@ def calcular_campo_espira(I, a, z_off, N, r_shape):
 
 with st.spinner('Calculando campos magnéticos...'):
     # Campos 2D
-    B_alambre_2d = calcular_campo_alambre(I_alambre, L_alambre, z_offset_alambre, N_elementos, r_2d)
-    B_espira_2d = calcular_campo_espira(I_espira, a_espira, z_offset_espira, N_elementos, r_2d)
-    B_total_2d = B_alambre_2d + B_espira_2d
+    B_alambre_2d_full = calcular_campo_alambre(I_alambre, L_alambre, z_offset_alambre, N_elementos, r_2d)
+    B_espira_2d_full = calcular_campo_espira(I_espira, a_espira, z_offset_espira, N_elementos, r_2d)
+    B_total_2d_full = B_alambre_2d_full + B_espira_2d_full
     
     # Campos 3D
     B_alambre_3d = calcular_campo_alambre(I_alambre, L_alambre, z_offset_alambre, N_elementos, r_3d)
@@ -133,13 +186,17 @@ with tab1:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Vista 2D (Plano XY, z=0)")
-        Bx_2d = B_alambre_2d[:, 0].reshape(xx_2d.shape)
-        By_2d = B_alambre_2d[:, 1].reshape(yy_2d.shape)
+        st.subheader(f"Vista 2D: Plano {plano_vista.split()[0]}")
+        st.caption(f"Corte en {coord_fija_label} = {coord_fija_val} m")
+        
+        Bu_2d = B_alambre_2d_full[:, idx_u].reshape(uu.shape)
+        Bv_2d = B_alambre_2d_full[:, idx_v].reshape(vv.shape)
+        
         fig_2d_alambre = crear_grafico_2d_plotly(
-            xx_2d, yy_2d, Bx_2d, By_2d,
+            uu, vv, Bu_2d, Bv_2d,
             titulo="",
-            geometria={'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre}
+            geometria={'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre},
+            xlabel=u_label, ylabel=v_label
         )
         st.plotly_chart(fig_2d_alambre, use_container_width=True)
     
@@ -161,13 +218,17 @@ with tab2:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Vista 2D (Plano XY, z=0)")
-        Bx_espira_2d = B_espira_2d[:, 0].reshape(xx_2d.shape)
-        By_espira_2d = B_espira_2d[:, 1].reshape(yy_2d.shape)
+        st.subheader(f"Vista 2D: Plano {plano_vista.split()[0]}")
+        st.caption(f"Corte en {coord_fija_label} = {coord_fija_val} m")
+        
+        Bu_espira_2d = B_espira_2d_full[:, idx_u].reshape(uu.shape)
+        Bv_espira_2d = B_espira_2d_full[:, idx_v].reshape(vv.shape)
+        
         fig_2d_espira = crear_grafico_2d_plotly(
-            xx_2d, yy_2d, Bx_espira_2d, By_espira_2d,
+            uu, vv, Bu_espira_2d, Bv_espira_2d,
             titulo="",
-            geometria={'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira}
+            geometria={'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira},
+            xlabel=u_label, ylabel=v_label
         )
         st.plotly_chart(fig_2d_espira, use_container_width=True)
     
@@ -190,18 +251,22 @@ with tab3:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Vista 2D (Plano XY, z=0)")
-        Bx_total_2d = B_total_2d[:, 0].reshape(xx_2d.shape)
-        By_total_2d = B_total_2d[:, 1].reshape(yy_2d.shape)
+        st.subheader(f"Vista 2D: Plano {plano_vista.split()[0]}")
+        st.caption(f"Corte en {coord_fija_label} = {coord_fija_val} m")
+        
+        Bu_total_2d = B_total_2d_full[:, idx_u].reshape(uu.shape)
+        Bv_total_2d = B_total_2d_full[:, idx_v].reshape(vv.shape)
+        
         fig_2d_total = crear_grafico_2d_plotly(
-            xx_2d, yy_2d, Bx_total_2d, By_total_2d,
+            uu, vv, Bu_total_2d, Bv_total_2d,
             titulo="",
             geometria={
                 'tipo': 'ambos',
                 'L': L_alambre, 'a': a_espira,
                 'z_offset_alambre': z_offset_alambre,
                 'z_offset_espira': z_offset_espira
-            }
+            },
+            xlabel=u_label, ylabel=v_label
         )
         st.plotly_chart(fig_2d_total, use_container_width=True)
     

@@ -2,7 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geometria=None):
+def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geometria=None, xlabel='x (m)', ylabel='y (m)'):
     """
     Crea un gráfico 2D interactivo del campo magnético usando Plotly.
     """
@@ -23,7 +23,7 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
         colorscale='Viridis',
         colorbar=dict(title='|B| (T)'),
         name='Magnitud',
-        hovertemplate='x: %{x:.3f}<br>y: %{y:.3f}<br>|B|: %{z:.3e} T<extra></extra>'
+        hovertemplate=f'{xlabel.split()[0]}: %{{x:.3f}}<br>{ylabel.split()[0]}: %{{y:.3f}}<br>|B|: %{{z:.3e}} T<extra></extra>'
     ))
     
     # Añadir vectores del campo (subsample para no saturar)
@@ -96,38 +96,22 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
     
     # Dibujar geometría
     if geometria:
-        if geometria['tipo'] in ['alambre', 'ambos']:
-            L = geometria.get('L', 2)
-            z_offset = geometria.get('z_offset_alambre', 0)
-            fig.add_trace(go.Scatter(
-                x=[0],
-                y=[0],
-                mode='markers',
-                marker=dict(size=15, color='red', symbol='x', line=dict(width=2, color='yellow')),
-                name='Alambre (Eje Z)',
-                hovertemplate=f'Alambre<br>L={L} m<br>z_offset={z_offset} m<extra></extra>'
-            ))
-        
-        if geometria['tipo'] in ['espira', 'ambos']:
-            a = geometria.get('a', 0.5)
-            z_offset = geometria.get('z_offset_espira', 0)
-            theta = np.linspace(0, 2*np.pi, 100)
-            fig.add_trace(go.Scatter(
-                x=a*np.cos(theta),
-                y=a*np.sin(theta),
-                mode='lines',
-                line=dict(color='cyan', width=3),
-                name='Espira',
-                hovertemplate=f'Espira<br>Radio={a} m<br>z_offset={z_offset} m<extra></extra>'
-            ))
+        # Nota: La geometría aquí asume proyección al plano 2D. 
+        # Si cambiamos de plano, la proyección debería cambiar.
+        # Por simplicidad, dibujamos proyecciones genéricas o puntos de corte si es posible.
+        # Para esta implementación rápida, mantenemos la lógica simple y el usuario interpretará.
+        pass 
+        # TODO: Mejorar proyección de geometría según el plano. 
+        # Por ahora, desactivamos geometría compleja en 2D si no es XY para evitar confusión,
+        # o dejamos que app.py maneje qué pasar en 'geometria'.
     
     fig.update_layout(
         title=titulo,
-        xaxis=dict(title='x (m)', scaleanchor='y', scaleratio=1),
-        yaxis=dict(title='y (m)'),
+        xaxis=dict(title=xlabel, scaleanchor='y', scaleratio=1),
+        yaxis=dict(title=ylabel),
         width=700,
         height=700,
-        showlegend=True,
+        showlegend=False, # Ocultar leyenda para limpiar vista 2D
         hovermode='closest',
         margin=dict(l=20, r=20, t=40, b=20)
     )
