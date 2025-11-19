@@ -107,6 +107,34 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
                     marker=dict(size=10, color='cyan', symbol='circle'),
                     name='Espira (Corte)'
                 ))
+
+        # --- BOBINAS DE HELMHOLTZ ---
+        if geometria['tipo'] == 'helmholtz':
+            R = geometria.get('R', 0.5)
+            # Dos espiras en z = -R/2 y z = +R/2
+            
+            if plano_key == 'XY':
+                # Vistas desde arriba (planta), se ven como un círculo (o dos coincidentes)
+                theta = np.linspace(0, 2*np.pi, 100)
+                fig.add_trace(go.Scatter(
+                    x=R*np.cos(theta), y=R*np.sin(theta), mode='lines',
+                    line=dict(color='orange', width=3),
+                    name='Bobinas Helmholtz'
+                ))
+            elif plano_key in ['XZ', 'YZ']:
+                # Corte transversal: 4 puntos (2 por bobina)
+                # Bobina 1 en -R/2
+                fig.add_trace(go.Scatter(
+                    x=[-R, R], y=[-R/2, -R/2], mode='markers',
+                    marker=dict(size=10, color='orange', symbol='circle'),
+                    name='Bobina 1'
+                ))
+                # Bobina 2 en +R/2
+                fig.add_trace(go.Scatter(
+                    x=[-R, R], y=[R/2, R/2], mode='markers',
+                    marker=dict(size=10, color='orange', symbol='circle'),
+                    name='Bobina 2'
+                ))
     
     fig.update_layout(
         title=titulo,
@@ -197,6 +225,32 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
                 line=dict(color='cyan', width=8),
                 name='Espira',
                 hovertemplate=f'Espira<br>Radio={a} m<extra></extra>'
+            ))
+
+        if geometria['tipo'] == 'helmholtz':
+            R = geometria.get('R', 0.5)
+            theta = np.linspace(0, 2*np.pi, 100)
+            
+            # Bobina 1 en -R/2
+            fig.add_trace(go.Scatter3d(
+                x=R*np.cos(theta),
+                y=R*np.sin(theta),
+                z=np.full_like(theta, -R/2),
+                mode='lines',
+                line=dict(color='orange', width=8),
+                name='Bobina 1',
+                hovertemplate=f'Bobina 1<br>z={-R/2} m<extra></extra>'
+            ))
+            
+            # Bobina 2 en +R/2
+            fig.add_trace(go.Scatter3d(
+                x=R*np.cos(theta),
+                y=R*np.sin(theta),
+                z=np.full_like(theta, R/2),
+                mode='lines',
+                line=dict(color='orange', width=8),
+                name='Bobina 2',
+                hovertemplate=f'Bobina 2<br>z={R/2} m<extra></extra>'
             ))
     
     # Configurar layout

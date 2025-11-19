@@ -52,6 +52,11 @@ with st.sidebar.expander("🔵 Espira Circular", expanded=True):
     a_espira = st.slider("Radio (m)", 0.1, 2.0, 0.5, 0.05, key="a_espira")
     z_offset_espira = st.slider("Posición Z (m)", -2.0, 2.0, 0.0, 0.1, key="z_espira")
 
+with st.sidebar.expander("🟠 Bobinas de Helmholtz", expanded=False):
+    I_helmholtz = st.slider("Corriente (A)", 0.0, 20.0, 5.0, 0.5, key="I_helmholtz")
+    R_helmholtz = st.slider("Radio R (m)", 0.1, 2.0, 0.5, 0.05, key="R_helmholtz")
+    st.caption(f"Separación d = R = {R_helmholtz} m")
+
 # Configuración Avanzada (Oculta por defecto)
 with st.sidebar.expander("⚙️ Configuración Avanzada", expanded=False):
     resolucion_2d = st.slider("Res. 2D", 10, 30, 20, 2)
@@ -135,7 +140,7 @@ def calcular_campo_espira(I, a, z_off, N, r_shape):
     r_flat = r_shape.reshape(-1, 3)
     return campo_espira(I, a, N, r_flat, z_offset=z_off)
 
-# Cálculos
+# Cálculos Básicos
 B_alambre_2d = calcular_campo_alambre(I_alambre, L_alambre, z_offset_alambre, N_elementos, r_2d)
 B_espira_2d = calcular_campo_espira(I_espira, a_espira, z_offset_espira, N_elementos, r_2d)
 B_total_2d = B_alambre_2d + B_espira_2d
@@ -144,10 +149,42 @@ B_alambre_3d = calcular_campo_alambre(I_alambre, L_alambre, z_offset_alambre, N_
 B_espira_3d = calcular_campo_espira(I_espira, a_espira, z_offset_espira, N_elementos, r_3d)
 B_total_3d = B_alambre_3d + B_espira_3d
 
+# Cálculos Helmholtz
+# Bobina 1 en z = -R/2, Bobina 2 en z = +R/2
+B_h1_2d = calcular_campo_espira(I_helmholtz, R_helmholtz, -R_helmholtz/2, N_elementos, r_2d)
+B_h2_2d = calcular_campo_espira(I_helmholtz, R_helmholtz, R_helmholtz/2, N_elementos, r_2d)
+B_helmholtz_2d = B_h1_2d + B_h2_2d
+
+B_h1_3d = calcular_campo_espira(I_helmholtz, R_helmholtz, -R_helmholtz/2, N_elementos, r_3d)
+B_h2_3d = calcular_campo_espira(I_helmholtz, R_helmholtz, R_helmholtz/2, N_elementos, r_3d)
+B_helmholtz_3d = B_h1_3d + B_h2_3d
+
 # ============================================================================
 # VISUALIZACIÓN (Tabs Minimalistas)
 # ============================================================================
-tab1, tab2, tab3, tab4 = st.tabs(["Alambre", "Espira", "Superposición", "Info"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🔴 Alambre Recto",
+    "🔵 Espira Circular",
+    "🟣 Superposición",
+    "🟠 Bobinas de Helmholtz",
+    "📚 Información"
+])
+
+def render_point_calculator(key_suffix, calc_func, *args, **kwargs):
+    """Helper para renderizar la calculadora en un punto dentro de una tab"""
+    with st.expander(f"📍 Calculadora de Campo en Punto ({key_suffix.capitalize()})"):
+        c1, c2, c3 = st.columns(3)
+        xt = c1.number_input("x (m)", value=0.3, step=0.1, format="%.2f", key=f"x_{key_suffix}")
+        yt = c2.number_input("y (m)", value=0.0, step=0.1, format="%.2f", key=f"y_{key_suffix}")
+        zt = c3.number_input("z (m)", value=0.2, step=0.1, format="%.2f", key=f"z_{key_suffix}")
+        
+        if st.button("Calcular", key=f"btn_{key_suffix}"):
+            pt = np.array([[xt, yt, zt]])
+            B_res = calc_func(*args, pt, **kwargs)
+            B_norm = np.linalg.norm(B_res)
+            
+            st.markdown(f"**Magnitud |B|:** `{B_norm:.6e} T`")
+            st.markdown(f"**Vector B:** `[{B_res[0,0]:.2e}, {B_res[0,1]:.2e}, {B_res[0,2]:.2e}] T`")
 
 def render_view(title, B_2d, B_3d, geo, key_suffix):
     col1, col2 = st.columns(2)
@@ -177,34 +214,100 @@ def render_view(title, B_2d, B_3d, geo, key_suffix):
 with tab1:
     render_view("Alambre", B_alambre_2d, B_alambre_3d, 
                 {'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre}, "alambre")
+    
+    # Calculadora específica para Alambre
+    render_point_calculator("alambre", campo_alambre, I_alambre, L_alambre, N_elementos, z_offset=z_offset_alambre)
 
 with tab2:
     render_view("Espira", B_espira_2d, B_espira_3d, 
                 {'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira}, "espira")
+    
+    # Calculadora específica para Espira
+    render_point_calculator("espira", campo_espira, I_espira, a_espira, N_elementos, z_offset=z_offset_espira)
 
 with tab3:
     render_view("Total", B_total_2d, B_total_3d, 
                 {'tipo': 'ambos', 'L': L_alambre, 'a': a_espira, 
                  'z_offset_alambre': z_offset_alambre, 'z_offset_espira': z_offset_espira}, "total")
+    
+    # Calculadora para Superposición
+    def calc_total(I_a, L_a, z_a, I_e, a_e, z_e, N, pt):
+        Ba = campo_alambre(I_a, L_a, N, pt, z_offset=z_a)
+        Be = campo_espira(I_e, a_e, N, pt, z_offset=z_e)
+        return Ba + Be
+        
+    render_point_calculator("total", calc_total, I_alambre, L_alambre, z_offset_alambre, I_espira, a_espira, z_offset_espira, N_elementos)
 
 with tab4:
-    st.markdown("### 📚 Teoría y Uso")
-    st.info("Utiliza el selector de planos arriba para cambiar entre vistas de planta (XY) y perfil (XZ, YZ).")
+    st.header("🟠 Bobinas de Helmholtz")
+    st.markdown(f"**Configuración**: Dos espiras de radio $R={R_helmholtz}$ m separadas por una distancia $d=R$. Corriente $I={I_helmholtz}$ A.")
+    
+    render_view("Helmholtz", B_helmholtz_2d, B_helmholtz_3d,
+                {'tipo': 'helmholtz', 'R': R_helmholtz}, "helmholtz")
+    
+    # Calculadora Helmholtz
+    def calc_helmholtz(I, R, N, pt):
+        B1 = campo_espira(I, R, N, pt, z_offset=-R/2)
+        B2 = campo_espira(I, R, N, pt, z_offset=R/2)
+        return B1 + B2
+    
+    render_point_calculator("helmholtz", calc_helmholtz, I_helmholtz, R_helmholtz, N_elementos)
+    
+    st.markdown("---")
     st.markdown("""
-    **Ley de Biot-Savart**:
-    $$ \\vec{B}(\\vec{r}) = \\frac{\\mu_0}{4\\pi} \\int \\frac{I \\, d\\vec{l}' \\times (\\vec{r} - \\vec{r}')}{|\\vec{r} - \\vec{r}'|^3} $$
+    ### Análisis de Bobinas de Helmholtz
+    
+    **¿Qué son?**
+    Son un par de bobinas circulares idénticas, colocadas paralelamente y separadas por una distancia igual a su radio ($d = R$). Por ambas circula la misma corriente en el mismo sentido.
+    
+    **¿Para qué se utilizan?**
+    Se utilizan para generar una región de **campo magnético casi uniforme** en el espacio entre ellas. Esto es fundamental en experimentos de física (como la medición de la relación carga-masa del electrón) y para cancelar campos magnéticos externos (como el campo terrestre).
+    
+    **Análisis de Resultados**
+    *   **Uniformidad**: Observa en la vista 2D (corte XZ o YZ) que las líneas de campo en la región central (entre las bobinas) son casi paralelas y equidistantes. Esto indica que el gradiente del campo es mínimo ($\partial B / \partial z \approx 0$ y $\partial^2 B / \partial z^2 \approx 0$ en el centro).
+    *   **Intensidad**: El campo en el centro es la suma constructiva de los campos de ambas bobinas.
+    """)
+
+with tab5:
+    st.header("📚 Análisis y Teoría")
+    
+    st.markdown("""
+    ### Preguntas de Análisis
+    
+    #### 1. ¿Cómo varía la magnitud del campo magnético con la distancia al conductor?
+    *   **Alambre Recto**: Para un alambre infinito, la magnitud decae inversamente con la distancia radial ($B \\propto 1/r$). Cerca de los extremos de un alambre finito, este comportamiento se modifica.
+    *   **Espira Circular**: En el eje de la espira, el campo decae rápidamente con la distancia $z$. Lejos de la espira ($z \\gg a$), se comporta como un dipolo magnético, decayendo como $1/z^3$.
+    
+    #### 2. ¿Son las líneas de campo magnético las esperadas?
+    *   **Sí**. Las visualizaciones muestran claramente:
+        *   Líneas concéntricas alrededor del alambre (regla de la mano derecha).
+        *   Líneas que pasan por el centro de la espira y se curvan alrededor de ella, cerrándose sobre sí mismas.
+        *   Esto confirma la naturaleza solenoidal del campo magnético ($\\nabla \\cdot \\vec{B} = 0$), es decir, no tiene monopolos; las líneas siempre se cierran.
+    
+    #### 3. ¿Qué puede decir de la validez de los resultados obtenidos a partir de la Ley de Biot-Savart?
+    *   **Validez**: La Ley de Biot-Savart es fundamental para la magnetostática (corrientes estacionarias). Los resultados numéricos obtenidos mediante la discretización del conductor (suma de Riemann de $I d\\vec{l} \\times \\vec{r} / r^3$) convergen a la solución teórica exacta a medida que aumentamos el número de elementos $N$.
+    *   **Limitaciones Numéricas**: Muy cerca de los conductores ($r \\to 0$), el término $1/r^2$ diverge, lo que puede causar inestabilidades numéricas (singularidades) si el punto de evaluación coincide exactamente con un segmento de corriente. En la simulación, esto se maneja evitando evaluar exactamente en el conductor o usando un mallado fino.
+    
+    ---
+    ### Teoría Fundamental
+    
+    La **Ley de Biot-Savart** describe el campo magnético generado por una corriente estacionaria:
+    
+    $$
+    \\vec{B}(\\vec{r}) = \\frac{\\mu_0}{4\\pi} \\int \\frac{I \\, d\\vec{l}' \\times (\\vec{r} - \\vec{r}')}{|\\vec{r} - \\vec{r}'|^3}
+    $$
     """)
     
-    # Punto de prueba simplificado
-    with st.expander("📍 Calculadora de Campo en Punto"):
-        c1, c2, c3 = st.columns(3)
-        xt = c1.number_input("x", 0.3)
-        yt = c2.number_input("y", 0.0)
-        zt = c3.number_input("z", 0.2)
-        
-        pt = np.array([[xt, yt, zt]])
-        Bt = campo_alambre(I_alambre, L_alambre, N_elementos, pt, z_offset_alambre) + \
-             campo_espira(I_espira, a_espira, N_elementos, pt, z_offset_espira)
-        
-        st.metric("Magnitud Total", f"{np.linalg.norm(Bt):.6e} T")
-        st.caption(f"Vector: {Bt[0]}")
+    st.info("💡 **Tip**: Usa la calculadora en cada pestaña para verificar numéricamente cómo disminuye el campo al aumentar la distancia (x, y o z).")
+
+# Footer
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: gray; font-size: 0.9em;'>
+    Laboratorio Computacional 2 - Física II | Ley de Biot-Savart<br>
+    Visualizador interactivo desarrollado con Streamlit & Plotly
+    </div>
+    """,
+    unsafe_allow_html=True
+)
