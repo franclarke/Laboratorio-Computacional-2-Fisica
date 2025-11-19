@@ -69,20 +69,28 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
             z_off = geometria.get('z_offset_alambre', 0)
             
             if plano_key == 'XY':
-                # Alambre es un punto en el origen (si z_off está en rango, pero dibujamos proyección)
+                # Alambre es un punto en el origen
+                # Sentido corriente: Saliente (punto) o Entrante (cruz)
+                # Asumimos I > 0 hacia +z (saliente en XY)
                 fig.add_trace(go.Scatter(
                     x=[0], y=[0], mode='markers',
-                    marker=dict(size=12, color='red', symbol='x'),
-                    name='Alambre (Eje Z)'
+                    marker=dict(size=15, color='red', symbol='circle-dot'),
+                    name='Alambre (I hacia +z)',
+                    hoverinfo='name'
                 ))
             elif plano_key in ['XZ', 'YZ']:
-                # Alambre es una línea vertical en el eje Z (que es el eje Y del plot en XZ/YZ)
-                # En XZ: x=0, z varía. En YZ: y=0, z varía.
-                # El eje vertical del plot es 'y' (que corresponde a z físico)
+                # Alambre es una línea vertical
                 fig.add_trace(go.Scatter(
                     x=[0, 0], y=[z_off - L/2, z_off + L/2], mode='lines',
                     line=dict(color='red', width=4),
                     name='Alambre'
+                ))
+                # Flecha de corriente
+                fig.add_trace(go.Scatter(
+                    x=[0], y=[z_off], mode='markers',
+                    marker=dict(symbol='arrow-up', size=15, color='red'),
+                    name='I (Alambre)',
+                    hoverinfo='name'
                 ))
 
         # --- ESPIRA ---
@@ -98,43 +106,69 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
                     line=dict(color='cyan', width=3),
                     name='Espira'
                 ))
+                # Flechas de corriente (antihorario)
+                theta_arrow = [0, np.pi/2, np.pi, 3*np.pi/2]
+                for th in theta_arrow:
+                    # Tangente para la flecha
+                    # dx = -sin(th), dy = cos(th)
+                    angle = np.degrees(np.arctan2(np.cos(th), -np.sin(th)))
+                    fig.add_trace(go.Scatter(
+                        x=[a*np.cos(th)], y=[a*np.sin(th)], mode='markers',
+                        marker=dict(symbol='arrow', size=12, color='cyan', angle=angle),
+                        showlegend=False, hoverinfo='skip'
+                    ))
+                    
             elif plano_key in ['XZ', 'YZ']:
-                # Espira son dos puntos (corte transversal)
-                # En XZ: puntos en (a, z_off) y (-a, z_off)
-                # En YZ: puntos en (a, z_off) y (-a, z_off) (simétrico)
+                # Espira son dos puntos
+                # Izquierda (-a): Corriente sale (punto) -> YZ: x=-a (sale si antihorario visto desde arriba?)
+                # Derecha (+a): Corriente entra (cruz)
                 fig.add_trace(go.Scatter(
-                    x=[-a, a], y=[z_off, z_off], mode='markers',
-                    marker=dict(size=10, color='cyan', symbol='circle'),
-                    name='Espira (Corte)'
+                    x=[-a], y=[z_off], mode='markers',
+                    marker=dict(size=12, color='cyan', symbol='circle-dot'),
+                    name='I Saliente',
+                    hoverinfo='name'
+                ))
+                fig.add_trace(go.Scatter(
+                    x=[a], y=[z_off], mode='markers',
+                    marker=dict(size=12, color='cyan', symbol='circle-x'),
+                    name='I Entrante',
+                    hoverinfo='name'
                 ))
 
         # --- BOBINAS DE HELMHOLTZ ---
         if geometria['tipo'] == 'helmholtz':
             R = geometria.get('R', 0.5)
-            # Dos espiras en z = -R/2 y z = +R/2
             
             if plano_key == 'XY':
-                # Vistas desde arriba (planta), se ven como un círculo (o dos coincidentes)
                 theta = np.linspace(0, 2*np.pi, 100)
                 fig.add_trace(go.Scatter(
                     x=R*np.cos(theta), y=R*np.sin(theta), mode='lines',
                     line=dict(color='orange', width=3),
                     name='Bobinas Helmholtz'
                 ))
+                # Flechas (antihorario)
+                theta_arrow = [0, np.pi/2, np.pi, 3*np.pi/2]
+                for th in theta_arrow:
+                    angle = np.degrees(np.arctan2(np.cos(th), -np.sin(th)))
+                    fig.add_trace(go.Scatter(
+                        x=[R*np.cos(th)], y=[R*np.sin(th)], mode='markers',
+                        marker=dict(symbol='arrow', size=12, color='orange', angle=angle),
+                        showlegend=False, hoverinfo='skip'
+                    ))
             elif plano_key in ['XZ', 'YZ']:
-                # Corte transversal: 4 puntos (2 por bobina)
-                # Bobina 1 en -R/2
-                fig.add_trace(go.Scatter(
-                    x=[-R, R], y=[-R/2, -R/2], mode='markers',
-                    marker=dict(size=10, color='orange', symbol='circle'),
-                    name='Bobina 1'
-                ))
-                # Bobina 2 en +R/2
-                fig.add_trace(go.Scatter(
-                    x=[-R, R], y=[R/2, R/2], mode='markers',
-                    marker=dict(size=10, color='orange', symbol='circle'),
-                    name='Bobina 2'
-                ))
+                # Bobina 1 (-R/2) y Bobina 2 (+R/2)
+                # Izquierda: Saliente, Derecha: Entrante
+                for z_c in [-R/2, R/2]:
+                    fig.add_trace(go.Scatter(
+                        x=[-R], y=[z_c], mode='markers',
+                        marker=dict(size=12, color='orange', symbol='circle-dot'),
+                        showlegend=False, hoverinfo='name', name='I Saliente'
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=[R], y=[z_c], mode='markers',
+                        marker=dict(size=12, color='orange', symbol='circle-x'),
+                        showlegend=False, hoverinfo='name', name='I Entrante'
+                    ))
     
     fig.update_layout(
         title=titulo,
@@ -212,6 +246,13 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
                 name='Alambre',
                 hovertemplate=f'Alambre<br>L={L} m<extra></extra>'
             ))
+            # Cono indicador dirección corriente (hacia +z)
+            fig.add_trace(go.Cone(
+                x=[0], y=[0], z=[z_offset],
+                u=[0], v=[0], w=[1],
+                sizemode="absolute", sizeref=0.5, anchor="tail",
+                showscale=False, colorscale=[[0, 'red'], [1, 'red']]
+            ))
         
         if geometria['tipo'] in ['espira', 'ambos']:
             a = geometria.get('a', 0.5)
@@ -226,32 +267,53 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
                 name='Espira',
                 hovertemplate=f'Espira<br>Radio={a} m<extra></extra>'
             ))
+            # Conos indicadores dirección corriente (antihorario)
+            # Puntos muestra: 0, 90, 180, 270 grados
+            th_arrows = [0, np.pi/2, np.pi, 3*np.pi/2]
+            x_arr = a * np.cos(th_arrows)
+            y_arr = a * np.sin(th_arrows)
+            z_arr = np.full_like(x_arr, z_offset)
+            # Tangentes: (-sin, cos, 0)
+            u_arr = -np.sin(th_arrows)
+            v_arr = np.cos(th_arrows)
+            w_arr = np.zeros_like(u_arr)
+            
+            fig.add_trace(go.Cone(
+                x=x_arr, y=y_arr, z=z_arr,
+                u=u_arr, v=v_arr, w=w_arr,
+                sizemode="absolute", sizeref=0.3, anchor="center",
+                showscale=False, colorscale=[[0, 'cyan'], [1, 'cyan']]
+            ))
 
         if geometria['tipo'] == 'helmholtz':
             R = geometria.get('R', 0.5)
             theta = np.linspace(0, 2*np.pi, 100)
             
-            # Bobina 1 en -R/2
-            fig.add_trace(go.Scatter3d(
-                x=R*np.cos(theta),
-                y=R*np.sin(theta),
-                z=np.full_like(theta, -R/2),
-                mode='lines',
-                line=dict(color='orange', width=8),
-                name='Bobina 1',
-                hovertemplate=f'Bobina 1<br>z={-R/2} m<extra></extra>'
-            ))
+            # Flechas para ambas bobinas
+            th_arrows = [0, np.pi/2, np.pi, 3*np.pi/2]
+            x_arr = R * np.cos(th_arrows)
+            y_arr = R * np.sin(th_arrows)
+            u_arr = -np.sin(th_arrows)
+            v_arr = np.cos(th_arrows)
+            w_arr = np.zeros_like(u_arr)
             
-            # Bobina 2 en +R/2
-            fig.add_trace(go.Scatter3d(
-                x=R*np.cos(theta),
-                y=R*np.sin(theta),
-                z=np.full_like(theta, R/2),
-                mode='lines',
-                line=dict(color='orange', width=8),
-                name='Bobina 2',
-                hovertemplate=f'Bobina 2<br>z={R/2} m<extra></extra>'
-            ))
+            for z_c, name in [(-R/2, 'Bobina 1'), (R/2, 'Bobina 2')]:
+                fig.add_trace(go.Scatter3d(
+                    x=R*np.cos(theta),
+                    y=R*np.sin(theta),
+                    z=np.full_like(theta, z_c),
+                    mode='lines',
+                    line=dict(color='orange', width=8),
+                    name=name,
+                    hovertemplate=f'{name}<br>z={z_c} m<extra></extra>'
+                ))
+                
+                fig.add_trace(go.Cone(
+                    x=x_arr, y=y_arr, z=np.full_like(x_arr, z_c),
+                    u=u_arr, v=v_arr, w=w_arr,
+                    sizemode="absolute", sizeref=0.3, anchor="center",
+                    showscale=False, colorscale=[[0, 'orange'], [1, 'orange']]
+                ))
     
     # Configurar layout
     fig.update_layout(
