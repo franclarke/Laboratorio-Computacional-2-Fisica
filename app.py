@@ -264,7 +264,7 @@ with tab4:
     Se utilizan para generar una región de **campo magnético casi uniforme** en el espacio entre ellas. Esto es fundamental en experimentos de física (como la medición de la relación carga-masa del electrón) y para cancelar campos magnéticos externos (como el campo terrestre).
     
     **Análisis de Resultados**
-    *   **Uniformidad**: Observa en la vista 2D (corte XZ o YZ) que las líneas de campo en la región central (entre las bobinas) son casi paralelas y equidistantes. Esto indica que el gradiente del campo es mínimo ($\partial B / \partial z \approx 0$ y $\partial^2 B / \partial z^2 \approx 0$ en el centro).
+    *   **Uniformidad**: Observa en la vista 2D (corte XZ o YZ) que las líneas de campo en la región central (entre las bobinas) son casi paralelas y equidistantes. Esto indica que el gradiente del campo es mínimo ($\\partial B / \\partial z \\approx 0$ y $\\partial^2 B / \\partial z^2 \\approx 0$ en el centro).
     *   **Intensidad**: El campo en el centro es la suma constructiva de los campos de ambas bobinas.
     """)
 
