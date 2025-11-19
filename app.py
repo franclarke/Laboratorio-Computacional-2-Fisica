@@ -198,7 +198,7 @@ with tab1:
             geometria={'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre},
             xlabel=u_label, ylabel=v_label
         )
-        st.plotly_chart(fig_2d_alambre, use_container_width=True)
+        st.plotly_chart(fig_2d_alambre, use_container_width=True, key="chart_2d_alambre")
     
     with col2:
         st.subheader("Vista 3D")
@@ -208,7 +208,7 @@ with tab1:
             titulo="",
             geometria={'tipo': 'alambre', 'L': L_alambre, 'z_offset_alambre': z_offset_alambre}
         )
-        st.plotly_chart(fig_3d_alambre, use_container_width=True)
+        st.plotly_chart(fig_3d_alambre, use_container_width=True, key="chart_3d_alambre")
 
 # --- TAB 2: ESPIRA ---
 with tab2:
@@ -230,7 +230,7 @@ with tab2:
             geometria={'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira},
             xlabel=u_label, ylabel=v_label
         )
-        st.plotly_chart(fig_2d_espira, use_container_width=True)
+        st.plotly_chart(fig_2d_espira, use_container_width=True, key="chart_2d_espira")
     
     with col2:
         st.subheader("Vista 3D")
@@ -240,7 +240,7 @@ with tab2:
             titulo="",
             geometria={'tipo': 'espira', 'a': a_espira, 'z_offset_espira': z_offset_espira}
         )
-        st.plotly_chart(fig_3d_espira, use_container_width=True)
+        st.plotly_chart(fig_3d_espira, use_container_width=True, key="chart_3d_espira")
 
 # --- TAB 3: SUPERPOSICIÓN ---
 with tab3:
@@ -268,7 +268,7 @@ with tab3:
             },
             xlabel=u_label, ylabel=v_label
         )
-        st.plotly_chart(fig_2d_total, use_container_width=True)
+        st.plotly_chart(fig_2d_total, use_container_width=True, key="chart_2d_total")
     
     with col2:
         st.subheader("Vista 3D")
@@ -283,7 +283,7 @@ with tab3:
                 'z_offset_espira': z_offset_espira
             }
         )
-        st.plotly_chart(fig_3d_total, use_container_width=True)
+        st.plotly_chart(fig_3d_total, use_container_width=True, key="chart_3d_total")
 
 # --- TAB 4: PUNTO DE PRUEBA ---
 with tab4:
