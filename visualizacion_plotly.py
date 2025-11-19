@@ -112,11 +112,17 @@ def crear_grafico_2d_plotly(xx, yy, Bx, By, titulo="Campo Magnético 2D", geomet
         title=titulo,
         xaxis=dict(title=xlabel, scaleanchor='y', scaleratio=1),
         yaxis=dict(title=ylabel),
-        width=700,
-        height=700,
+        autosize=True,
         showlegend=True,
         hovermode='closest',
-        margin=dict(l=20, r=20, t=40, b=20)
+        margin=dict(l=20, r=20, t=40, b=20),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
     
     return fig
@@ -197,15 +203,21 @@ def crear_grafico_3d_plotly(x, y, z, Bx, By, Bz, titulo="Campo Magnético 3D", g
     fig.update_layout(
         title=titulo,
         scene=dict(
-            xaxis=dict(title='x (m)'),
-            yaxis=dict(title='y (m)'),
-            zaxis=dict(title='z (m)'),
-            aspectmode='cube'
+            xaxis_title='x (m)',
+            yaxis_title='y (m)',
+            zaxis_title='z (m)',
+            aspectmode='data' # Mantiene proporción real
         ),
-        width=700,
-        height=700,
+        autosize=True,
         showlegend=True,
-        margin=dict(l=0, r=0, t=40, b=0)
+        margin=dict(l=0, r=0, b=0, t=40),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=0.9,
+            xanchor="center",
+            x=0.5
+        )
     )
     
     return fig
